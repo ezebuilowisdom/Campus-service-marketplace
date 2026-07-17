@@ -36,15 +36,14 @@ const signup = async (req, res, next) => {
       });
     }
 
-    // 1. Register user in Supabase auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    // 1. Register user in Supabase auth using admin client to auto-confirm email
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      options: {
-        data: {
-          full_name,
-          role
-        }
+      email_confirm: true,
+      user_metadata: {
+        full_name,
+        role
       }
     });
 
@@ -54,9 +53,16 @@ const signup = async (req, res, next) => {
 
     const userId = authData.user.id;
 
+    // Ensure roles are seeded in database if they don't exist
+    await supabaseAdmin.from('roles').upsert([
+      { id: 1, name: 'admin' },
+      { id: 2, name: 'provider' },
+      { id: 3, name: 'customer' }
+    ], { onConflict: 'id' });
+
     // 2. Insert role mapping, profile, wallet & specific table
     const { data: roleRow } = await supabase.from('roles').select('id').eq('name', role).single();
-    const roleId = roleRow ? roleRow.id : 3; // default customer
+    const roleId = roleRow ? roleRow.id : (role === 'admin' ? 1 : (role === 'provider' ? 2 : 3));
 
     // Profiles
     const { error: profileErr } = await supabaseAdmin.from('profiles').insert([{
