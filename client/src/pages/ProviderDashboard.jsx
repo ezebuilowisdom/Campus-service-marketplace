@@ -33,14 +33,7 @@ export default function ProviderDashboard({ user }) {
   const [bookings, setBookings] = useState([]);
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
-  
-  // Wallet
-  const [wallet, setWallet] = useState({ balance: 0, escrow_balance: 0 });
-  const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [bankName, setBankName] = useState('GTBank');
-  const [accountNumber, setAccountNumber] = useState('');
-  const [accountName, setAccountName] = useState('');
-  const [withdrawSuccess, setWithdrawSuccess] = useState(false);
+
 
   // Form lists
   const [showAddService, setShowAddService] = useState(false);
@@ -67,7 +60,6 @@ export default function ProviderDashboard({ user }) {
     fetchBookings();
     fetchProviderServices();
     fetchCategories();
-    fetchWallet();
   }, []);
 
   const fetchProviderProfile = async () => {
@@ -121,18 +113,7 @@ export default function ProviderDashboard({ user }) {
     }
   };
 
-  const fetchWallet = async () => {
-    try {
-      const res = await axios.get('/api/wallets', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      if (res.data.success) {
-        setWallet(res.data.wallet);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
+
 
   const handleBookingAction = async (bookingId, action) => {
     try {
@@ -142,7 +123,6 @@ export default function ProviderDashboard({ user }) {
       if (res.data.success) {
         alert(`Booking status changed successfully: ${action}`);
         fetchBookings();
-        fetchWallet();
       }
     } catch (err) {
       alert(err.response?.data?.message || 'Error updating booking status.');
@@ -195,33 +175,7 @@ export default function ProviderDashboard({ user }) {
     }
   };
 
-  const handleWithdrawal = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await axios.post('/api/wallets/withdraw', {
-        amount: parseFloat(withdrawAmount),
-        payout_method: 'bank_transfer',
-        bank_name: bankName,
-        account_number: accountNumber,
-        account_name: accountName
-      }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
 
-      if (res.data.success) {
-        setWithdrawSuccess(true);
-        fetchWallet();
-        setTimeout(() => {
-          setWithdrawSuccess(false);
-          setWithdrawAmount('');
-          setAccountNumber('');
-          setAccountName('');
-        }, 3000);
-      }
-    } catch (err) {
-      alert(err.response?.data?.message || 'Error submitting payout request.');
-    }
-  };
 
   const handleAddPortfolio = (e) => {
     e.preventDefault();
@@ -251,23 +205,10 @@ export default function ProviderDashboard({ user }) {
           </div>
         </div>
 
-        {/* Escrow Balance */}
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200/20 shadow-sm space-y-2 flex flex-col justify-between">
-          <div className="flex justify-between items-start text-xs text-slate-400">
-            <span>Escrow Holding Balance</span>
-            <span className="text-cyan-500 uppercase font-bold flex items-center gap-1">
-              <FiShield className="w-3.5 h-3.5 fill-current" />
-              Locked
-            </span>
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 block leading-none">In Escrow Hold</span>
-            <span className="text-3xl font-extrabold font-sans text-slate-800 dark:text-slate-200">${wallet.escrow_balance}</span>
-          </div>
-        </div>
-
+      {/* Overview stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {/* Jobs Done */}
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200/20 shadow-sm space-y-2 flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200/20 shadow-sm space-y-2 flex flex-col justify-between animate-fade-in">
           <span className="text-xs text-slate-400 block">Total Bookings</span>
           <span className="text-3xl font-extrabold font-sans text-slate-800 dark:text-slate-200">{bookings.length}</span>
         </div>
@@ -295,6 +236,7 @@ export default function ProviderDashboard({ user }) {
           </div>
         </div>
       </div>
+      </div>
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 dark:border-slate-800/80 gap-6">
@@ -309,12 +251,6 @@ export default function ProviderDashboard({ user }) {
           className={`py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition ${activeTab === 'services' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-650'}`}
         >
           Manage Listings
-        </button>
-        <button
-          onClick={() => setActiveTab('withdrawals')}
-          className={`py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition ${activeTab === 'withdrawals' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-650'}`}
-        >
-          Withdraw Earnings
         </button>
         <button
           onClick={() => setActiveTab('portfolio')}
@@ -572,85 +508,7 @@ export default function ProviderDashboard({ user }) {
             ))}
           </div>
         </div>
-      )}
-
-      {/* 3. Withdraw Earnings Tab */}
-      {activeTab === 'withdrawals' && (
-        <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-200/20 shadow-sm max-w-lg space-y-6">
-          <div>
-            <h2 className="text-xl font-bold font-sans">Withdraw Usable Balance</h2>
-            <p className="text-slate-450 text-xs mt-1">Submit bank details. Funds are transferred manually by administrators.</p>
-          </div>
-
-          {withdrawSuccess ? (
-            <div className="bg-success/10 text-success text-xs font-bold p-4 rounded-2xl text-center">
-              🎉 Withdrawal Request Submitted Successfully! It will be reviewed by admin.
-            </div>
-          ) : (
-            <form onSubmit={handleWithdrawal} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500">Withdrawal Amount ($)</label>
-                <input
-                  type="number"
-                  required
-                  placeholder="Max: 450.00"
-                  max={wallet.balance}
-                  value={withdrawAmount}
-                  onChange={(e) => setWithdrawAmount(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2.5 text-xs outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500">Select Bank</label>
-                  <select
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2.5 text-xs outline-none"
-                  >
-                    <option value="GTBank">Guaranty Trust Bank</option>
-                    <option value="Access">Access Bank</option>
-                    <option value="UBA">United Bank for Africa</option>
-                    <option value="Zenith">Zenith Bank</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500">Account Number</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="0123456789"
-                    value={accountNumber}
-                    onChange={(e) => setAccountNumber(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2.5 text-xs outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500">Account Holder Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. David Adebayo"
-                  value={accountName}
-                  onChange={(e) => setAccountName(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2.5 text-xs outline-none"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 rounded-xl text-xs transition shadow-md shadow-primary/20 mt-4"
-              >
-                Submit Payout Request
-              </button>
-            </form>
-          )}
-        </div>
-      )}
+           )}
 
       {/* 4. Portfolio items */}
       {activeTab === 'portfolio' && (

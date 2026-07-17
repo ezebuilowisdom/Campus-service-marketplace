@@ -157,7 +157,7 @@ const updateBookingStatus = async (req, res, next) => {
     if (transitionText === 'accept') {
       newStatusId = 2;
       notificationTitle = 'Booking Accepted';
-      notificationMsg = 'Your booking has been accepted! You can now proceed to payment.';
+      notificationMsg = 'Your booking has been accepted! The provider will contact you shortly to coordinate details.';
     } else if (transitionText === 'reject') {
       newStatusId = 3;
       notificationTitle = 'Booking Rejected';
@@ -165,11 +165,11 @@ const updateBookingStatus = async (req, res, next) => {
     } else if (transitionText === 'complete') {
       newStatusId = 5;
       notificationTitle = 'Job Completed';
-      notificationMsg = 'The provider marked the job as completed. Please confirm to release funds.';
+      notificationMsg = 'The provider marked the job as completed. Please confirm to finalize.';
     } else if (transitionText === 'confirm') {
       newStatusId = 6;
-      notificationTitle = 'Funds Released!';
-      notificationMsg = 'The customer confirmed completion. Escrow funds have been added to your wallet.';
+      notificationTitle = 'Booking Confirmed';
+      notificationMsg = 'The customer confirmed completion of the service.';
     } else if (transitionText === 'cancel') {
       newStatusId = 7;
       notificationTitle = 'Booking Cancelled';
@@ -184,12 +184,6 @@ const updateBookingStatus = async (req, res, next) => {
 
       const booking = mockBookings[idx];
       booking.status_id = newStatusId;
-
-      // Handle escrow release simulator logic
-      if (transitionText === 'confirm') {
-        // Mock Release Escrow Funds: customer releases funds to provider balance
-        console.log(`Mock releasing $${booking.price} from escrow to provider ${booking.provider_id}`);
-      }
 
       return res.status(200).json({ success: true, message: `Booking status updated to ${action} (Mock Mode)`, booking });
     }
@@ -232,50 +226,6 @@ const updateBookingStatus = async (req, res, next) => {
       message: notificationMsg,
       type: 'booking'
     }]);
-
-    // 4. ESCROW FUNDS RELEASE LOGIC: When customer CONFIRMS completion, release from escrow balance to usable balance
-    if (transitionText === 'confirm') {
-      const providerId = booking.provider_id;
-      
-      // Fetch provider wallet
-      const { data: wallet } = await supabase.from('wallets').select('*').eq('user_id', providerId).single();
-      
-      if (wallet) {
-        // Calculate service price less platform fee (e.g. 5% platform fee)
-        const feePercentObj = await supabase.from('system_settings').select('value').eq('key', 'platform_fee_percent').single();
-        const feePercent = feePercentObj ? parseFloat(feePercentObj.data.value) : 5.0;
-        const feeAmount = (booking.price * feePercent) / 100.0;
-        const providerShare = booking.price - feeAmount;
-
-        const newEscrowBal = Math.max(0, parseFloat(wallet.escrow_balance) - booking.price);
-        const newBal = parseFloat(wallet.balance) + providerShare;
-
-        // Perform Wallet Update
-        await supabaseAdmin.from('wallets').update({
-          balance: newBal,
-          escrow_balance: newEscrowBal,
-          updated_at: new Date()
-        }).eq('id', wallet.id);
-
-        // Record wallet transaction
-        await supabaseAdmin.from('wallet_transactions').insert([
-          {
-            wallet_id: wallet.id,
-            amount: providerShare,
-            type: 'escrow_release',
-            status: 'completed',
-            reference_id: booking.id,
-            description: `Released escrow earnings from booking ${booking.id} (Ref. Fee ${feeAmount.toFixed(2)})`
-          }
-        ]);
-
-        // Mark payment escrow status as released
-        await supabaseAdmin.from('payments').update({
-          escrow_status: 'released',
-          updated_at: new Date()
-        }).eq('booking_id', booking.id);
-      }
-    }
 
     res.status(200).json({ success: true, message: `Booking marked as ${action}.`, booking: updatedBooking });
   } catch (err) {

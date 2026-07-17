@@ -130,8 +130,8 @@ export default function AdminDashboard({ user }) {
 
       {/* Analytics stats */}
       {stats && (
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-6">
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200/20 shadow-sm flex flex-col justify-between">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200/20 shadow-sm flex flex-col justify-between animate-fade-in">
             <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Total Users</span>
             <span className="text-3xl font-extrabold text-slate-800 dark:text-slate-200 mt-2 font-sans">{stats.totalUsers}</span>
           </div>
@@ -147,10 +147,6 @@ export default function AdminDashboard({ user }) {
             <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Pending Bookings</span>
             <span className="text-3xl font-extrabold text-slate-800 dark:text-slate-200 mt-2 font-sans">{stats.pendingBookings}</span>
           </div>
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200/20 shadow-sm flex flex-col justify-between">
-            <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Escrow Holds Total</span>
-            <span className="text-3xl font-extrabold text-primary mt-2 font-sans">${stats.totalRevenue.toFixed(2)}</span>
-          </div>
         </div>
       )}
 
@@ -161,12 +157,6 @@ export default function AdminDashboard({ user }) {
           className={`py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition ${activeSubTab === 'verifications' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-650'}`}
         >
           Provider Verifications ({verifications.length})
-        </button>
-        <button
-          onClick={() => setActiveSubTab('withdrawals')}
-          className={`py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition ${activeSubTab === 'withdrawals' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-650'}`}
-        >
-          Payout Withdrawals ({withdrawals.length})
         </button>
         <button
           onClick={() => setActiveSubTab('users')}
@@ -216,49 +206,7 @@ export default function AdminDashboard({ user }) {
         </div>
       )}
 
-      {/* 2. Payout Withdrawals Requests Pane */}
-      {activeSubTab === 'withdrawals' && (
-        <div className="space-y-4">
-          {withdrawals.length === 0 ? (
-            <div className="text-center py-12 bg-white dark:bg-slate-800/40 rounded-3xl border border-dashed border-slate-200/30">
-              <h3 className="text-xs font-bold">No Payout Payout requests</h3>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {withdrawals.map((req) => (
-                <div key={req.id} className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200/20 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="bg-primary/10 text-primary text-xs font-bold py-1 px-3 rounded-lg">${parseFloat(req.amount).toFixed(2)}</span>
-                      <span className="text-xs text-slate-500 uppercase">Status: {req.status}</span>
-                    </div>
-                    <h3 className="font-bold text-sm">Provider: {req.provider?.profiles?.full_name || 'David Adebayo'}</h3>
-                    <div className="text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200/10">
-                      <strong>Method:</strong> {req.payout_method} | <strong>Bank:</strong> {req.payout_details?.bank_name} | <strong>Account:</strong> {req.payout_details?.account_number} ({req.payout_details?.account_name})
-                    </div>
-                  </div>
-                  {req.status === 'pending' && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleWithdrawal(req.id, 'approved')}
-                        className="bg-success hover:bg-success/90 text-white font-bold py-2 px-4 rounded-xl text-xs flex items-center gap-1 transition"
-                      >
-                        <FiCheck className="w-3.5 h-3.5" /> Approve Payout
-                      </button>
-                      <button
-                        onClick={() => handleWithdrawal(req.id, 'rejected')}
-                        className="bg-danger hover:bg-danger/90 text-white font-bold py-2 px-4 rounded-xl text-xs flex items-center gap-1 transition"
-                      >
-                        <FiX className="w-3.5 h-3.5" /> Decline Refund
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+
 
       {/* 3. User Moderation Pane */}
       {activeSubTab === 'users' && (

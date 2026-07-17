@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FiSearch, FiTrendingUp, FiScissors, FiBookOpen, 
   FiCpu, FiCamera, FiMapPin, FiClock, FiStar, 
-  FiArrowRight, FiShield, FiDollarSign, FiCheckCircle 
+  FiArrowRight, FiShield, FiDollarSign, FiCheckCircle,
+  FiMessageSquare, FiCheck
 } from 'react-icons/fi';
 
 const iconMap = {
@@ -396,18 +397,18 @@ export default function LandingPage({ user, onAddBooking }) {
       <section className="bg-slate-100 dark:bg-slate-800/20 py-16 px-4">
         <div className="max-w-7xl mx-auto text-center space-y-12">
           <div className="space-y-3">
-            <h2 className="text-2xl sm:text-3xl font-bold font-sans">The Escrow-Backed Booking Flow</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold font-sans">Simple 4-Step Booking Flow</h2>
             <p className="text-slate-500 text-sm max-w-xl mx-auto">
-              We eliminate trust issues on campus. Payment is secured in escrow and only released when the work meets your satisfaction.
+              Find and hire verified student providers on your campus. Settle details directly and pay in-person upon job completion.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {[
-              { step: '1', title: 'Request Service', desc: 'Select a vetted provider, book your slot, and outline requirements.', icon: FiClock },
-              { step: '2', title: 'Provider Accepts', desc: 'The student provider reviews requirements and accepts the timeline.', icon: FiCheckCircle },
-              { step: '3', title: 'Fund Escrow', desc: 'Pay securely. Your money is held in a protected campus escrow ledger.', icon: FiShield },
-              { step: '4', title: 'Job Done & Confirmed', desc: 'Once delivered, confirm completion to release funds and submit a review.', icon: FiDollarSign }
+              { step: '1', title: 'Request Gig', desc: 'Pick your preferred student provider, select a booking slot, and describe requirements.', icon: FiClock },
+              { step: '2', title: 'Provider Accepts', desc: 'The provider reviews your request, slot availability, and accepts the booking.', icon: FiCheckCircle },
+              { step: '3', title: 'Connect & Coordinate', desc: 'Chat directly on the platform to coordinate details, meeting spots, or delivery.', icon: FiMessageSquare },
+              { step: '4', title: 'Meet & Complete', desc: 'Meet up to get the work done, settle the price directly in person, and leave a review.', icon: FiCheck }
             ].map((card, i) => {
               const IconComp = card.icon;
               return (

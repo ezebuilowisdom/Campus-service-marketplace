@@ -9,11 +9,11 @@ import {
 
 const statusNames = {
   1: 'Pending Acceptance',
-  2: 'Accepted (Awaiting Payment)',
+  2: 'Accepted',
   3: 'Rejected by Provider',
-  4: 'Paid (Escrow Hold)',
-  5: 'Completed (Awaiting Release)',
-  6: 'Confirmed (Completed)',
+  4: 'In Progress',
+  5: 'Completed (Awaiting Confirmation)',
+  6: 'Completed',
   7: 'Cancelled'
 };
 
@@ -70,31 +70,8 @@ export default function CustomerDashboard({ user }) {
     }
   };
 
-  const handleCheckout = async (e) => {
-    e.preventDefault();
-    setPayLoading(true);
-    try {
-      const res = await axios.post('/api/payments/checkout', {
-        booking_id: selectedBookingForPay.id,
-        gateway: paymentGateway
-      }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-
-      if (res.data.success) {
-        alert(`Payment successful! Funds are secure in Escrow holding. (Reference: ${res.data.transaction_reference})`);
-        setSelectedBookingForPay(null);
-        fetchBookings();
-      }
-    } catch (err) {
-      alert(err.response?.data?.message || 'Payment simulation failed.');
-    } finally {
-      setPayLoading(false);
-    }
-  };
-
   const handleConfirmCompletion = async (bookingId) => {
-    if (!window.confirm('Confirming completion will immediately release the escrow holding to the provider wallet. Proceed?')) return;
+    if (!window.confirm('Confirming completion will mark this booking as finished and allow you to leave a review. Proceed?')) return;
     try {
       const res = await axios.put(`/api/bookings/${bookingId}/status`, {
         action: 'confirm'
@@ -109,7 +86,7 @@ export default function CustomerDashboard({ user }) {
         fetchBookings();
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Error releasing escrow.');
+      alert(err.response?.data?.message || 'Error confirming completion.');
     }
   };
 
@@ -264,25 +241,14 @@ export default function CustomerDashboard({ user }) {
                         <span>Chat</span>
                       </button>
 
-                      {/* Pay checkout trigger */}
-                      {booking.status_id === 2 && (
-                        <button
-                          onClick={() => setSelectedBookingForPay(booking)}
-                          className="flex items-center space-x-1 bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-xl text-xs shadow-md shadow-primary/20 transition"
-                        >
-                          <FiShield className="w-3.5 h-3.5" />
-                          <span>Pay into Escrow</span>
-                        </button>
-                      )}
-
-                      {/* Confirm release hold trigger */}
+                      {/* Confirm completion trigger */}
                       {booking.status_id === 5 && (
                         <button
                           onClick={() => handleConfirmCompletion(booking.id)}
                           className="flex items-center space-x-1 bg-success hover:bg-success/90 text-white font-bold py-2 px-4 rounded-xl text-xs shadow-md shadow-success/20 transition"
                         >
                           <FiCheck className="w-3.5 h-3.5" />
-                          <span>Confirm & Release</span>
+                          <span>Confirm Completed</span>
                         </button>
                       )}
 
@@ -314,90 +280,7 @@ export default function CustomerDashboard({ user }) {
         </div>
       )}
 
-      {/* 1. Checkout Simulator Modal */}
-      <AnimatePresence>
-        {selectedBookingForPay && (
-          <div className="fixed inset-0 z-50 bg-black/55 flex items-center justify-center p-4 overflow-y-auto">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.96 }}
-              className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-8 shadow-2xl border border-slate-100 dark:border-slate-800"
-            >
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <h2 className="text-xl font-bold font-sans">Secure Checkout</h2>
-                  <p className="text-xs text-slate-500 mt-1">Funds are placed in escrow until job completion.</p>
-                </div>
-                <button 
-                  onClick={() => setSelectedBookingForPay(null)}
-                  className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-400 hover:text-slate-600 transition"
-                >
-                  ✕
-                </button>
-              </div>
 
-              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200/10 mb-6 flex justify-between items-center text-xs">
-                <div>
-                  <span className="text-slate-400 block">Total Due</span>
-                  <span className="font-bold text-slate-800 dark:text-slate-200">{selectedBookingForPay.service?.title}</span>
-                </div>
-                <span className="text-lg font-extrabold text-primary font-sans">
-                  ${parseFloat(selectedBookingForPay.price).toFixed(2)}
-                </span>
-              </div>
-
-              <form onSubmit={handleCheckout} className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500">Select Gateway</label>
-                  <select
-                    value={paymentGateway}
-                    onChange={(e) => setPaymentGateway(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2.5 text-xs focus:ring-2 focus:ring-primary/45 outline-none font-bold"
-                  >
-                    <option value="simulator">🎓 Test Simulator (Recommended)</option>
-                    <option value="paystack">💳 Paystack Card Payout</option>
-                    <option value="stripe">💳 Stripe Global Checkout</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500">Cardholder Card details</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="4000 1234 5678 9010"
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2.5 text-xs focus:ring-2 focus:ring-primary/45 outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <input
-                    type="text"
-                    placeholder="MM/YY"
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2.5 text-xs focus:ring-2 focus:ring-primary/45 outline-none text-center"
-                  />
-                  <input
-                    type="password"
-                    placeholder="CVV"
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2.5 text-xs focus:ring-2 focus:ring-primary/45 outline-none text-center"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={payLoading}
-                  className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 rounded-xl text-xs transition shadow-md shadow-primary/20 disabled:opacity-50 mt-6"
-                >
-                  {payLoading ? 'Processing transaction...' : `Pay $${parseFloat(selectedBookingForPay.price).toFixed(2)} Now`}
-                </button>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* 2. Review Submission Modal */}
       <AnimatePresence>
