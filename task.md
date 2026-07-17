@@ -1,0 +1,32 @@
+# Campus Service Marketplace - Task List
+
+- [x] Database Schema and Seed Data
+  - [x] Create `supabase/schema.sql` with full tables, keys, triggers, and indices
+  - [x] Create `supabase/seed.sql` with university-focused service categories, sample users, and listings
+- [x] Backend Development (Express API)
+  - [x] Setup Server project structure and `package.json`
+  - [x] Create server entrance `server.js` and configuration files
+  - [x] Create Zod validation schemas and auth/role middlewares
+  - [x] Implement REST endpoints: Auth, Services, Bookings, Payments & Wallets, User/Admin Moderation
+- [x] Frontend Development (Vite + React)
+  - [x] Setup React client with Vite and Tailwind CSS
+  - [x] Design premium, modern UI tokens (glassmorphism, icons, colors)
+  - [x] Create shared components (Navbar, Sidebar, Modal, ReviewCard, Button, Input)
+  - [x] Build landing/home page, authentication views (Login, Signup, Reset)
+  - [x] Build Customer Dashboard (Bookings, Favorites, Chat, Profile)
+  - [x] Build Provider Dashboard (Portfolio, Services list, Earnings, Analytics, Calendar)
+  - [x] Build Admin Dashboard (Verify providers, manage reports, user status controls, analytics overview)
+  - [x] Create multi-step Booking Flow & interactive Payment/Escrow Simulator
+- [x] AI Assistant Feature
+  - [x] Create `server/src/controllers/aiController.js` natural language parsing engine
+  - [x] Create `server/src/routes/aiRoutes.js`
+  - [x] Create `client/src/components/AIAssistantWidget.jsx` interactive floating chat drawer
+- [x] New Pages & Navigation Setup
+  - [x] Create `client/src/pages/AboutUs.jsx`
+  - [x] Create `client/src/pages/ContactUs.jsx`
+  - [x] Create `client/src/pages/ServicesCatalog.jsx`
+  - [x] Update `client/src/App.jsx` and `client/src/components/Navbar.jsx` with routes
+  - [x] Update `server/server.js` registration
+- [x] Verification & Documentation
+  - [x] Verify AI Natural Language queries and page routes
+  - [x] Update `walkthrough.md` with features overview
