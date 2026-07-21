@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../lib/api';
 import { motion } from 'framer-motion';
 import { 
   FiUserCheck, FiDollarSign, FiCpu, FiTrendingUp, 
@@ -28,9 +28,7 @@ export default function AdminDashboard({ user }) {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('/api/admin/stats', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
+      const res = await api.get('/admin/stats');
       if (res.data.success) {
         setStats(res.data.stats);
       }
@@ -43,9 +41,7 @@ export default function AdminDashboard({ user }) {
 
   const fetchVerifications = async () => {
     try {
-      const res = await axios.get('/api/admin/verifications', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
+      const res = await api.get('/admin/verifications');
       if (res.data.success) {
         setVerifications(res.data.requests);
       }
@@ -56,9 +52,7 @@ export default function AdminDashboard({ user }) {
 
   const fetchWithdrawals = async () => {
     try {
-      const res = await axios.get('/api/admin/withdrawals', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
+      const res = await api.get('/admin/withdrawals');
       if (res.data.success) {
         setWithdrawals(res.data.requests);
       }
@@ -69,11 +63,9 @@ export default function AdminDashboard({ user }) {
 
   const handleVerification = async (id, status) => {
     try {
-      const res = await axios.put(`/api/admin/verifications/${id}`, {
+      const res = await api.put(`/admin/verifications/${id}`, {
         status,
         reviewer_notes: `Processed by Administrator on ${new Date().toLocaleDateString()}`
-      }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
 
       if (res.data.success) {
@@ -87,9 +79,7 @@ export default function AdminDashboard({ user }) {
 
   const handleWithdrawal = async (id, status) => {
     try {
-      const res = await axios.put(`/api/admin/withdrawals/${id}`, { status }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
+      const res = await api.put(`/admin/withdrawals/${id}`, { status });
 
       if (res.data.success) {
         alert(`Payout request status set to ${status}.`);
@@ -101,22 +91,18 @@ export default function AdminDashboard({ user }) {
     }
   };
 
-  const toggleUserSuspension = async (userId, currentStatus) => {
-    const nextStatus = currentStatus === 'active' ? 'suspended' : 'active';
-    if (!window.confirm(`Are you sure you want to ${nextStatus === 'suspended' ? 'SUSPEND' : 'ACTIVATE'} this user?`)) return;
+  const toggleUserStatus = async (userId, currentStatus) => {
+    const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
+    if (!window.confirm(`Are you sure you want to ${newStatus === 'suspended' ? 'SUSPEND' : 'ACTIVATE'} this user?`)) return;
 
     try {
-      const res = await axios.put(`/api/admin/users/${userId}/status`, { status: nextStatus }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-
+      const res = await api.put(`/admin/users/${userId}/status`, { status: newStatus });
       if (res.data.success) {
-        alert(`User is now ${nextStatus}.`);
-        // Update local mock list
-        setUsersList(prev => prev.map(u => u.id === userId ? { ...u, status: nextStatus } : u));
+        alert(`User is now ${newStatus}.`);
+        setUsersList(prev => prev.map(u => u.id === userId ? { ...u, status: newStatus } : u));
       }
     } catch (err) {
-      alert('Error toggling user status.');
+      alert('Error updating user status.');
     }
   };
 

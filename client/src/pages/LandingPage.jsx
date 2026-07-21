@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FiSearch, FiTrendingUp, FiScissors, FiBookOpen, 
@@ -92,7 +92,7 @@ export default function LandingPage({ user, onAddBooking }) {
 
   const fetchCategories = async () => {
     try {
-      const res = await axios.get('/api/services/categories');
+      const res = await api.get('/services/categories');
       if (res.data.success) {
         setCategories(res.data.categories);
       }
@@ -104,11 +104,10 @@ export default function LandingPage({ user, onAddBooking }) {
   const fetchServices = async (categorySlug = null) => {
     setLoading(true);
     try {
-      let url = '/api/services';
       const params = {};
       if (categorySlug) params.category = categorySlug;
       
-      const res = await axios.get(url, { params });
+      const res = await api.get('/services', { params });
       if (res.data.success) {
         setServices(res.data.services);
       }
@@ -123,7 +122,7 @@ export default function LandingPage({ user, onAddBooking }) {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await axios.get('/api/services', {
+      const res = await api.get('/services', {
         params: {
           search: searchQuery,
           category: selectedCategory
@@ -157,13 +156,11 @@ export default function LandingPage({ user, onAddBooking }) {
     }
 
     try {
-      const res = await axios.post('/api/bookings', {
+      const res = await api.post('/bookings', {
         service_id: selectedService.id,
         booking_date: bookingDate,
         booking_time: bookingTime,
         notes: bookingNotes
-      }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
 
       if (res.data.success) {

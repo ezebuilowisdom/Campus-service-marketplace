@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  FiDollarSign, FiCalendar, FiScissors, FiShield, 
-  FiFileText, FiPlus, FiTrash, FiEdit2, 
-  FiCheck, FiX, FiAward, FiAlertCircle, 
-  FiGrid, FiTrendingUp, FiUserCheck, FiUpload 
+  FiDollarSign, FiCalendar, FiShield, 
+  FiPlus, FiTrash,
+  FiCheck, FiX, FiAlertCircle, 
+  FiUserCheck, FiShoppingBag
 } from 'react-icons/fi';
 
 const statusNames = {
@@ -33,9 +33,11 @@ export default function ProviderDashboard({ user }) {
   const [bookings, setBookings] = useState([]);
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [wallet, setWallet] = useState({ balance: 0.00, escrow_balance: 0.00 });
+  const [verificationStatus, setVerificationStatus] = useState('pending');
+  const [loading, setLoading] = useState(true);
 
-
-  // Form lists
+  // Service form fields
   const [showAddService, setShowAddService] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -45,83 +47,97 @@ export default function ProviderDashboard({ user }) {
   const [locationType, setLocationType] = useState('campus');
   const [buildingName, setBuildingName] = useState('');
   const [roomNumber, setRoomNumber] = useState('');
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState('');
 
-  // Portfolios
-  const [portfolioItems, setPortfolioItems] = useState([
-    { id: '1', title: 'Calculus Session notes', media_url: 'https://images.unsplash.com/photo-1544717297-fa95b6ee9643' }
-  ]);
+  // Portfolio
+  const [portfolioItems, setPortfolioItems] = useState([]);
   const [newPortfolioTitle, setNewPortfolioTitle] = useState('');
 
-  // Verification
-  const [verificationStatus, setVerificationStatus] = useState('pending');
-
   useEffect(() => {
-    fetchProviderProfile();
-    fetchBookings();
-    fetchProviderServices();
-    fetchCategories();
+    const loadAll = async () => {
+      setLoading(true);
+      await Promise.all([
+        fetchProviderProfile(),
+        fetchBookings(),
+        fetchProviderServices(),
+        fetchCategories(),
+        fetchWallet(),
+      ]);
+      setLoading(false);
+    };
+    loadAll();
   }, []);
 
   const fetchProviderProfile = async () => {
     try {
-      const res = await axios.get('/api/auth/profile', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
+      const res = await api.get('/auth/profile');
       if (res.data.success) {
         setVerificationStatus(res.data.profile.verification_status || 'pending');
       }
     } catch (err) {
-      console.error(err);
+      console.error('Profile fetch error:', err);
+    }
+  };
+
+  const fetchWallet = async () => {
+    try {
+      const res = await api.get('/wallets');
+      if (res.data.success) {
+        setWallet(res.data.wallet);
+      }
+    } catch (err) {
+      console.error('Wallet fetch error:', err);
     }
   };
 
   const fetchBookings = async () => {
     try {
-      const res = await axios.get('/api/bookings', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
+      const res = await api.get('/bookings');
       if (res.data.success) {
         setBookings(res.data.bookings);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Bookings fetch error:', err);
     }
   };
 
   const fetchProviderServices = async () => {
     try {
-      const res = await axios.get('/api/services');
+      const res = await api.get('/services/mine');
       if (res.data.success) {
-        // Filter mock services of current provider
-        const filtered = res.data.services.filter(s => s.provider_id === user.id);
-        setServices(filtered);
+        setServices(res.data.services);
       }
     } catch (err) {
-      console.error(err);
+      // fallback: get all and filter by provider id
+      try {
+        const res2 = await api.get('/services');
+        if (res2.data.success) {
+          setServices(res2.data.services.filter(s => s.provider_id === user.id));
+        }
+      } catch (err2) {
+        console.error('Services fetch error:', err2);
+      }
     }
   };
 
   const fetchCategories = async () => {
     try {
-      const res = await axios.get('/api/services/categories');
+      const res = await api.get('/services/categories');
       if (res.data.success) {
         setCategories(res.data.categories);
         if (res.data.categories.length > 0) setCategoryId(res.data.categories[0].id);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Categories fetch error:', err);
     }
   };
 
-
-
   const handleBookingAction = async (bookingId, action) => {
     try {
-      const res = await axios.put(`/api/bookings/${bookingId}/status`, { action }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
+      const res = await api.put(`/bookings/${bookingId}/status`, { action });
       if (res.data.success) {
-        alert(`Booking status changed successfully: ${action}`);
+        alert(`Booking ${action}ed successfully.`);
         fetchBookings();
       }
     } catch (err) {
@@ -131,178 +147,181 @@ export default function ProviderDashboard({ user }) {
 
   const handleAddService = async (e) => {
     e.preventDefault();
+    setFormLoading(true);
+    setFormError('');
     try {
-      const res = await axios.post('/api/services', {
+      const res = await api.post('/services', {
         category_id: parseInt(categoryId),
         title,
         description,
         price: parseFloat(price),
         duration_minutes: parseInt(duration),
-        location_type,
+        location_type: locationType,
         building_name: buildingName,
         room_number: roomNumber
-      }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
 
       if (res.data.success) {
-        alert('Service listing added successfully.');
         setShowAddService(false);
-        setTitle('');
-        setDescription('');
-        setPrice('');
+        setTitle(''); setDescription(''); setPrice('');
         fetchProviderServices();
       }
     } catch (err) {
-      const errorMsg = err.response?.data?.errors
+      const msg = err.response?.data?.errors
         ? err.response.data.errors.map(e => e.message).join('\n')
         : (err.response?.data?.message || 'Error adding service listing.');
-      alert(errorMsg);
+      setFormError(msg);
+    } finally {
+      setFormLoading(false);
     }
   };
 
   const handleDeleteService = async (id) => {
-    if (!window.confirm('Are you sure you want to remove this service gig?')) return;
+    if (!window.confirm('Remove this service listing?')) return;
     try {
-      const res = await axios.delete(`/api/services/${id}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      if (res.data.success) {
-        fetchProviderServices();
-      }
+      const res = await api.delete(`/services/${id}`);
+      if (res.data.success) fetchProviderServices();
     } catch (err) {
       alert('Error deleting service.');
     }
   };
 
-
-
   const handleAddPortfolio = (e) => {
     e.preventDefault();
-    if (!newPortfolioTitle) return;
-    const newItem = {
+    if (!newPortfolioTitle.trim()) return;
+    setPortfolioItems(prev => [...prev, {
       id: Date.now().toString(),
       title: newPortfolioTitle,
-      media_url: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1'
-    };
-    setPortfolioItems(prev => [...prev, newItem]);
+      media_url: 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?auto=format&fit=crop&w=600&q=80'
+    }]);
     setNewPortfolioTitle('');
   };
 
+  const completedBookings = bookings.filter(b => b.status_id === 6).length;
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 space-y-8">
-      {/* Overview stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
-        {/* Wallet Balance */}
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200/20 shadow-sm space-y-2 flex flex-col justify-between">
-          <div className="flex justify-between items-start text-xs text-slate-400">
-            <span>Usable Payout Balance</span>
-            <span className="text-success uppercase font-bold">Available</span>
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 block leading-none">Total Balance</span>
-            <span className="text-3xl font-extrabold font-sans text-slate-800 dark:text-slate-200">${wallet.balance}</span>
-          </div>
-        </div>
 
-      {/* Overview stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        {/* Jobs Done */}
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200/20 shadow-sm space-y-2 flex flex-col justify-between animate-fade-in">
-          <span className="text-xs text-slate-400 block">Total Bookings</span>
-          <span className="text-3xl font-extrabold font-sans text-slate-800 dark:text-slate-200">{bookings.length}</span>
+      {/* Header */}
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200/20 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold font-sans">Provider Studio</h1>
+          <p className="text-slate-500 text-xs mt-1">
+            Welcome back, <span className="font-semibold text-primary">{user?.name}</span>
+            {user?.shop_name && <span className="text-slate-400"> · {user.shop_name}</span>}
+          </p>
         </div>
-
-        {/* Verification Status */}
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200/20 shadow-sm space-y-2 flex flex-col justify-between">
-          <span className="text-xs text-slate-400 block">Verification status</span>
-          <div className="flex items-center space-x-2">
-            {verificationStatus === 'approved' ? (
-              <>
-                <FiUserCheck className="text-success w-6 h-6" />
-                <span className="font-extrabold text-sm uppercase text-success tracking-wider">Approved</span>
-              </>
-            ) : verificationStatus === 'rejected' ? (
-              <>
-                <FiX className="text-danger w-6 h-6" />
-                <span className="font-extrabold text-sm uppercase text-danger tracking-wider">Rejected</span>
-              </>
-            ) : (
-              <>
-                <FiAlertCircle className="text-amber-500 w-6 h-6 animate-pulse" />
-                <span className="font-extrabold text-sm uppercase text-amber-500 tracking-wider">Pending</span>
-              </>
-            )}
-          </div>
+        <div className={`flex items-center gap-2 py-2 px-4 rounded-2xl text-xs font-bold border ${
+          verificationStatus === 'approved'
+            ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-200/30'
+            : verificationStatus === 'rejected'
+            ? 'bg-red-50 dark:bg-red-900/20 text-danger border-red-200/30'
+            : 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200/30'
+        }`}>
+          {verificationStatus === 'approved' ? <FiUserCheck className="w-4 h-4" /> :
+           verificationStatus === 'rejected' ? <FiX className="w-4 h-4" /> :
+           <FiAlertCircle className="w-4 h-4 animate-pulse" />}
+          <span className="uppercase tracking-wider">
+            {verificationStatus === 'approved' ? 'Verified Provider' :
+             verificationStatus === 'rejected' ? 'Verification Rejected' : 'Pending Verification'}
+          </span>
         </div>
       </div>
+
+      {/* Stats Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-slate-200/20 shadow-sm space-y-1">
+          <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Wallet Balance</span>
+          <span className="text-2xl font-extrabold font-sans text-slate-800 dark:text-slate-200">
+            ₦{parseFloat(wallet?.balance ?? 0).toFixed(2)}
+          </span>
+          <span className="text-[10px] text-success font-bold uppercase">Available</span>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-slate-200/20 shadow-sm space-y-1">
+          <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Escrow Hold</span>
+          <span className="text-2xl font-extrabold font-sans text-amber-500">
+            ₦{parseFloat(wallet?.escrow_balance ?? 0).toFixed(2)}
+          </span>
+          <span className="text-[10px] text-amber-500 font-bold uppercase">Locked</span>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-slate-200/20 shadow-sm space-y-1">
+          <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Total Bookings</span>
+          <span className="text-2xl font-extrabold font-sans text-slate-800 dark:text-slate-200">{bookings.length}</span>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-slate-200/20 shadow-sm space-y-1">
+          <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Completed Jobs</span>
+          <span className="text-2xl font-extrabold font-sans text-slate-800 dark:text-slate-200">{completedBookings}</span>
+        </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800/80 gap-6">
-        <button
-          onClick={() => setActiveTab('bookings')}
-          className={`py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition ${activeTab === 'bookings' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-650'}`}
-        >
-          Incoming Bookings
-        </button>
-        <button
-          onClick={() => setActiveTab('services')}
-          className={`py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition ${activeTab === 'services' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-650'}`}
-        >
-          Manage Listings
-        </button>
-        <button
-          onClick={() => setActiveTab('portfolio')}
-          className={`py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition ${activeTab === 'portfolio' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-650'}`}
-        >
-          My Portfolio
-        </button>
+      <div className="flex border-b border-slate-200 dark:border-slate-800/80 gap-6 overflow-x-auto">
+        {['bookings', 'services', 'portfolio'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition whitespace-nowrap ${activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+          >
+            {tab === 'bookings' ? 'Incoming Bookings' : tab === 'services' ? 'Manage Listings' : 'My Portfolio'}
+          </button>
+        ))}
       </div>
 
-      {/* 1. Incoming Bookings Tab */}
+      {/* ── Tab: Incoming Bookings ── */}
       {activeTab === 'bookings' && (
         <div className="space-y-4">
-          {bookings.length === 0 ? (
+          {loading ? (
+            <div className="space-y-3">
+              {[1, 2].map(n => <div key={n} className="h-28 bg-white dark:bg-slate-800 animate-pulse rounded-2xl" />)}
+            </div>
+          ) : bookings.length === 0 ? (
             <div className="text-center py-16 bg-white dark:bg-slate-800/40 rounded-3xl border border-dashed border-slate-200/50">
-              <span className="text-3xl">📭</span>
-              <h3 className="text-md font-bold mt-2">No Incoming Bookings Yet</h3>
-              <p className="text-xs text-slate-500">Service requests will display here once customers order your services.</p>
+              <span className="text-4xl">📭</span>
+              <h3 className="text-md font-bold mt-3">No Bookings Yet</h3>
+              <p className="text-xs text-slate-500 mt-1">Service requests will appear here once customers order from you.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
               {bookings.map((booking) => (
-                <div key={booking.id} className="bg-white dark:bg-slate-800/40 rounded-3xl p-6 border border-slate-200/40 dark:border-slate-700/40 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <motion.div
+                  key={booking.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-white dark:bg-slate-800/40 rounded-3xl p-6 border border-slate-200/40 dark:border-slate-700/40 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6"
+                >
                   <div className="space-y-2 flex-1">
                     <div className="flex flex-wrap items-center gap-3">
                       <span className={`text-xs font-bold py-1 px-3 rounded-lg ${statusColors[booking.status_id]}`}>
                         {statusNames[booking.status_id]}
                       </span>
                       <span className="text-xs font-bold text-slate-500">
-                        Date Requested: {booking.booking_date} @ {booking.booking_time}
+                        {booking.booking_date} @ {booking.booking_time}
                       </span>
                     </div>
-
                     <h3 className="text-lg font-bold font-sans">{booking.service?.title}</h3>
                     <p className="text-xs text-slate-400">
-                      Customer Student: <span className="font-semibold text-slate-600 dark:text-slate-350">{booking.customer?.profiles?.full_name || 'Bob Sterling'}</span>
+                      Customer: <span className="font-semibold text-slate-600 dark:text-slate-300">
+                        {booking.customer?.profiles?.full_name || 'Student Customer'}
+                      </span>
                     </p>
-
                     {booking.notes && (
                       <div className="bg-slate-50 dark:bg-slate-800/80 p-3 rounded-xl border border-slate-200/10 text-xs text-slate-500 max-w-md">
-                        <span className="font-bold block text-slate-600">Client details:</span>
+                        <span className="font-bold block text-slate-600 dark:text-slate-400">Client Note:</span>
                         {booking.notes}
                       </div>
                     )}
                   </div>
 
                   <div className="flex flex-col items-start md:items-end gap-3 shrink-0">
-                    <div className="text-left md:text-right">
-                      <span className="text-xs text-slate-400 block">Total Earnings</span>
-                      <span className="text-xl font-extrabold text-slate-800 dark:text-slate-200 font-sans">${parseFloat(booking.price).toFixed(2)}</span>
+                    <div className="text-right">
+                      <span className="text-xs text-slate-400 block">Earnings</span>
+                      <span className="text-xl font-extrabold text-slate-800 dark:text-slate-200 font-sans">
+                        ₦{parseFloat(booking.price).toFixed(2)}
+                      </span>
                     </div>
-
-                    {/* Action buttons */}
                     <div className="flex gap-2">
                       {booking.status_id === 1 && (
                         <>
@@ -320,17 +339,175 @@ export default function ProviderDashboard({ user }) {
                           </button>
                         </>
                       )}
-
                       {booking.status_id === 4 && (
                         <button
                           onClick={() => handleBookingAction(booking.id, 'complete')}
                           className="bg-success hover:bg-success/90 text-white font-bold py-2 px-4 rounded-xl text-xs shadow-md shadow-success/20 transition flex items-center gap-1"
                         >
-                          <FiCheck className="w-3.5 h-3.5" /> Mark Job Complete
+                          <FiCheck className="w-3.5 h-3.5" /> Mark Complete
                         </button>
                       )}
                     </div>
                   </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Tab: Manage Listings ── */}
+      {activeTab === 'services' && (
+        <div className="space-y-6">
+          {verificationStatus !== 'approved' && (
+            <div className="bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 p-4 rounded-2xl text-xs font-semibold leading-relaxed flex items-center gap-2.5">
+              <FiAlertCircle className="w-5 h-5 shrink-0" />
+              <span>Your profile is pending administrator verification. You can list services once approved.</span>
+            </div>
+          )}
+
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-bold font-sans">Active Gig Listings ({services.length})</h2>
+            {verificationStatus === 'approved' ? (
+              <button
+                onClick={() => setShowAddService(!showAddService)}
+                className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-xl text-xs flex items-center space-x-1.5 transition"
+              >
+                <FiPlus className="w-4 h-4" />
+                <span>{showAddService ? 'Cancel' : 'Create New Service'}</span>
+              </button>
+            ) : (
+              <span className="text-xs text-slate-400 italic">Approval required to list services</span>
+            )}
+          </div>
+
+          {/* Add Service Form */}
+          <AnimatePresence>
+            {showAddService && (
+              <motion.form
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                onSubmit={handleAddService}
+                className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200/25 space-y-4 max-w-2xl overflow-hidden"
+              >
+                <h3 className="font-bold text-sm font-sans">New Service Listing</h3>
+
+                {formError && (
+                  <div className="bg-danger/10 border border-danger/20 text-danger text-xs font-bold px-4 py-3 rounded-xl">
+                    {formError}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500">Category</label>
+                    <select
+                      value={categoryId}
+                      onChange={(e) => setCategoryId(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs outline-none"
+                    >
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500">Location Type</label>
+                    <select
+                      value={locationType}
+                      onChange={(e) => setLocationType(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs outline-none"
+                    >
+                      <option value="campus">Hostel / Campus Spot</option>
+                      <option value="online">Online / Remote</option>
+                      <option value="delivery">Campus Delivery</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500">Gig Title</label>
+                  <input type="text" required placeholder="e.g. Knotless Braids, Screen Repair"
+                    value={title} onChange={e => setTitle(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500">Description</label>
+                  <textarea rows="3" required placeholder="What's included? Explain clearly..."
+                    value={description} onChange={e => setDescription(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500">Price (₦)</label>
+                    <input type="number" required placeholder="2500" min="1"
+                      value={price} onChange={e => setPrice(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500">Duration (minutes)</label>
+                    <input type="number" required placeholder="60" min="1"
+                      value={duration} onChange={e => setDuration(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </div>
+                </div>
+
+                {locationType === 'campus' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <input type="text" placeholder="Building / Hostel Hall"
+                      value={buildingName} onChange={e => setBuildingName(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                    <input type="text" placeholder="Room Number (optional)"
+                      value={roomNumber} onChange={e => setRoomNumber(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </div>
+                )}
+
+                <button type="submit" disabled={formLoading}
+                  className="bg-primary hover:bg-primary-dark text-white font-bold py-2.5 px-6 rounded-xl text-xs transition disabled:opacity-50"
+                >
+                  {formLoading ? 'Publishing...' : 'Publish Gig'}
+                </button>
+              </motion.form>
+            )}
+          </AnimatePresence>
+
+          {/* Services Grid */}
+          {services.length === 0 ? (
+            <div className="text-center py-12 bg-white dark:bg-slate-800/40 rounded-3xl border border-dashed border-slate-200/50">
+              <span className="text-3xl">🛍️</span>
+              <h3 className="text-sm font-bold mt-3">No listings yet</h3>
+              <p className="text-xs text-slate-500 mt-1">Create your first gig to start accepting customers.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {services.map((service) => (
+                <div key={service.id} className="bg-white dark:bg-slate-800/50 p-6 rounded-3xl border border-slate-200/20 shadow-sm flex justify-between items-center gap-4">
+                  <div>
+                    <h3 className="font-bold text-sm leading-snug">{service.title}</h3>
+                    <span className="text-[10px] text-slate-400 block mt-1 uppercase tracking-wider">
+                      {service.location_type} · {service.duration_minutes} mins
+                    </span>
+                    <span className="text-sm font-bold text-primary block mt-2">
+                      ₦{parseFloat(service.price).toFixed(2)}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteService(service.id)}
+                    className="p-2.5 bg-danger/10 text-danger hover:bg-danger/20 rounded-xl transition"
+                    title="Delete Listing"
+                  >
+                    <FiTrash className="w-4 h-4" />
+                  </button>
                 </div>
               ))}
             </div>
@@ -338,219 +515,45 @@ export default function ProviderDashboard({ user }) {
         </div>
       )}
 
-      {/* 2. Manage Listings Tab */}
-      {activeTab === 'services' && (
-        <div className="space-y-6">
-          {verificationStatus !== 'approved' && (
-            <div className="bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 p-4 rounded-2xl text-xs font-semibold leading-relaxed flex items-center gap-2.5">
-              <FiAlertCircle className="w-5 h-5 shrink-0" />
-              <span>
-                Your provider profile is currently pending administrator verification. 
-                You will be able to list new services and accept bookings as soon as your account is approved.
-              </span>
-            </div>
-          )}
-
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-bold font-sans">Active Gig Listings</h2>
-            {verificationStatus === 'approved' ? (
-              <button
-                onClick={() => setShowAddService(!showAddService)}
-                className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-xl text-xs flex items-center space-x-1.5 transition"
-              >
-                <FiPlus className="w-4 h-4" />
-                <span>Create New Service</span>
-              </button>
-            ) : (
-              <button
-                disabled
-                className="bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed font-bold py-2 px-4 rounded-xl text-xs flex items-center space-x-1.5"
-                title="Account approval required"
-              >
-                <FiPlus className="w-4 h-4" />
-                <span>Create New Service (Locked)</span>
-              </button>
-            )}
-          </div>
-
-          {/* Add Service Block */}
-          {showAddService && (
-            <motion.form
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              onSubmit={handleAddService}
-              className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200/25 space-y-4 max-w-2xl"
-            >
-              <h3 className="font-bold text-sm font-sans mb-2">Gig Parameters</h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500">Service Category</label>
-                  <select
-                    value={categoryId}
-                    onChange={(e) => setCategoryId(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs outline-none"
-                  >
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500">Location Type</label>
-                  <select
-                    value={locationType}
-                    onChange={(e) => setLocationType(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-855 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs outline-none"
-                  >
-                    <option value="campus">Hostel / Campus Spot</option>
-                    <option value="online">Online / Remote</option>
-                    <option value="delivery">Campus Delivery</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500">Gig Title</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Knotless Braids, Screen repair"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs outline-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500">Full Description</label>
-                <textarea
-                  rows="3"
-                  required
-                  placeholder="Explain exactly what is included in this service..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs outline-none"
-                ></textarea>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500">Price Rate ($)</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="25.00"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500">Duration (Minutes)</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="60"
-                    value={duration}
-                    onChange={(e) => setDuration(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs outline-none"
-                  />
-                </div>
-              </div>
-
-              {locationType === 'campus' && (
-                <div className="grid grid-cols-2 gap-4">
-                  <input
-                    type="text"
-                    placeholder="Building name / Hostel Hall"
-                    value={buildingName}
-                    onChange={(e) => setBuildingName(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs outline-none"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Room Number (optional)"
-                    value={roomNumber}
-                    onChange={(e) => setRoomNumber(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs outline-none"
-                  />
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="bg-primary hover:bg-primary-dark text-white font-bold py-2.5 px-6 rounded-xl text-xs transition"
-              >
-                Publish Gig
-              </button>
-            </motion.form>
-          )}
-
-          {/* Services List */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {services.map((service) => (
-              <div key={service.id} className="bg-white dark:bg-slate-800/50 p-6 rounded-3xl border border-slate-200/20 shadow-sm flex justify-between items-center gap-4">
-                <div>
-                  <h3 className="font-bold text-sm leading-snug">{service.title}</h3>
-                  <span className="text-[10px] text-slate-400 block mt-1 uppercase tracking-wider">{service.location_type} • {service.duration_minutes} Mins</span>
-                  <span className="text-sm font-bold text-primary block mt-2">${parseFloat(service.price).toFixed(2)}</span>
-                </div>
-                <button
-                  onClick={() => handleDeleteService(service.id)}
-                  className="p-2.5 bg-danger/10 text-danger hover:bg-danger/20 rounded-xl transition"
-                  title="Delete Listing"
-                >
-                  <FiTrash className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-           )}
-
-      {/* 4. Portfolio items */}
+      {/* ── Tab: Portfolio ── */}
       {activeTab === 'portfolio' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-bold font-sans">Portfolio Gallery</h2>
             <form onSubmit={handleAddPortfolio} className="flex gap-2">
               <input
-                type="text"
-                required
-                placeholder="Item title..."
-                value={newPortfolioTitle}
-                onChange={(e) => setNewPortfolioTitle(e.target.value)}
-                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs outline-none"
+                type="text" required placeholder="Item title..."
+                value={newPortfolioTitle} onChange={e => setNewPortfolioTitle(e.target.value)}
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/30"
               />
-              <button
-                type="submit"
-                className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-xl text-xs transition"
-              >
-                Add Image
+              <button type="submit" className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded-xl text-xs transition">
+                Add
               </button>
             </form>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            {portfolioItems.map((item) => (
-              <div key={item.id} className="bg-white dark:bg-slate-800 rounded-3xl overflow-hidden border border-slate-200/20 shadow-sm">
-                <img 
-                  src={item.media_url} 
-                  alt={item.title} 
-                  className="w-full h-48 object-cover" 
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&w=600&q=80';
-                  }}
-                />
-                <div className="p-4">
-                  <h4 className="font-bold text-xs">{item.title}</h4>
+          {portfolioItems.length === 0 ? (
+            <div className="text-center py-12 bg-white dark:bg-slate-800/40 rounded-3xl border border-dashed border-slate-200/50">
+              <span className="text-3xl">🖼️</span>
+              <h3 className="text-sm font-bold mt-3">No portfolio items yet</h3>
+              <p className="text-xs text-slate-500 mt-1">Add images to showcase your best work to potential customers.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              {portfolioItems.map((item) => (
+                <div key={item.id} className="bg-white dark:bg-slate-800 rounded-3xl overflow-hidden border border-slate-200/20 shadow-sm">
+                  <img
+                    src={item.media_url} alt={item.title}
+                    className="w-full h-48 object-cover"
+                    onError={e => { e.target.onerror = null; e.target.src = 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&w=600&q=80'; }}
+                  />
+                  <div className="p-4">
+                    <h4 className="font-bold text-xs">{item.title}</h4>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -69,7 +69,10 @@ app.use((req, res, next) => {
 // Global Error Handler Middleware
 app.use(errorHandler);
 
+const seedAuthUsers = require('./src/config/seedAuth');
+
 // Start Server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`📡 Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+  await seedAuthUsers();
 });

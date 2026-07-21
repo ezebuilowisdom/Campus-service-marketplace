@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
+import api from '../lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiCpu, FiSend, FiStar, FiCalendar, FiShield, FiDollarSign, FiClock } from 'react-icons/fi';
 
@@ -42,7 +42,7 @@ export default function AIAssistantWidget({ user }) {
     setLoading(true);
 
     try {
-      const res = await axios.post('/api/ai/query', { query: text });
+      const res = await api.post('/ai/query', { query: text });
       if (res.data.success) {
         setMessages(prev => [...prev, {
           id: (Date.now() + 1).toString(),
@@ -79,13 +79,11 @@ export default function AIAssistantWidget({ user }) {
   const handleSubmitBooking = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post('/api/bookings', {
+      const res = await api.post('/bookings', {
         service_id: bookingService.id,
         booking_date: bookingDate,
         booking_time: bookingTime,
         notes: bookingNotes
-      }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
 
       if (res.data.success) {

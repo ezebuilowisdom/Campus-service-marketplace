@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FiClock, FiCheck, FiX, FiShield, FiDollarSign, 
@@ -57,9 +57,7 @@ export default function CustomerDashboard({ user }) {
   const fetchBookings = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('/api/bookings', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
+      const res = await api.get('/bookings');
       if (res.data.success) {
         setBookings(res.data.bookings);
       }
@@ -73,10 +71,8 @@ export default function CustomerDashboard({ user }) {
   const handleConfirmCompletion = async (bookingId) => {
     if (!window.confirm('Confirming completion will mark this booking as finished and allow you to leave a review. Proceed?')) return;
     try {
-      const res = await axios.put(`/api/bookings/${bookingId}/status`, {
+      const res = await api.put(`/bookings/${bookingId}/status`, {
         action: 'confirm'
-      }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
 
       if (res.data.success) {

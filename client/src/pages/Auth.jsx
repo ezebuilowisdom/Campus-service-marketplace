@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../lib/api';
 import { motion } from 'framer-motion';
-import { FiMail, FiLock, FiUser, FiBriefcase, FiGrid, FiArrowLeft } from 'react-icons/fi';
+import { FiMail, FiLock, FiUser, FiBriefcase, FiGrid, FiArrowLeft, FiShoppingBag } from 'react-icons/fi';
 
 export default function Auth({ onLoginSuccess }) {
   const [searchParams] = useSearchParams();
@@ -20,6 +20,7 @@ export default function Auth({ onLoginSuccess }) {
   const [matricNumber, setMatricNumber] = useState('');
   const [department, setDepartment] = useState('');
   const [bio, setBio] = useState('');
+  const [shopName, setShopName] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -34,11 +35,11 @@ export default function Auth({ onLoginSuccess }) {
     setErrorMsg('');
 
     try {
-      let url = '/api/auth/login';
+      let endpoint = '/auth/login';
       let payload = { email, password };
 
       if (mode === 'register') {
-        url = '/api/auth/signup';
+        endpoint = '/auth/signup';
         payload = {
           email,
           password,
@@ -46,11 +47,12 @@ export default function Auth({ onLoginSuccess }) {
           role,
           matric_number: role === 'customer' ? matricNumber : undefined,
           department: role === 'customer' ? department : undefined,
-          bio: role === 'provider' ? bio : undefined
+          bio: role === 'provider' ? bio : undefined,
+          shop_name: role === 'provider' ? shopName : undefined
         };
       }
 
-      const res = await axios.post(url, payload);
+      const res = await api.post(endpoint, payload);
 
       if (res.data.success) {
         localStorage.setItem('token', res.data.token);
@@ -229,19 +231,35 @@ export default function Auth({ onLoginSuccess }) {
             </div>
           )}
 
-          {/* Provider Specific Bio */}
+          {/* Provider Specific Fields: Shop Name + Bio */}
           {mode === 'register' && role === 'provider' && (
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-500">Professional Bio</label>
-              <textarea
-                required
-                rows="2"
-                placeholder="Describe your skillset (e.g. Barbering since 2 years, hair styling projects...)"
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary/30 outline-none"
-              ></textarea>
-            </div>
+            <>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500">Store / Shop Name</label>
+                <div className="flex items-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 gap-2">
+                  <FiShoppingBag className="text-slate-400" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Dave's Barbershop, Quick Prints Hub"
+                    value={shopName}
+                    onChange={(e) => setShopName(e.target.value)}
+                    className="w-full bg-transparent border-none outline-none py-2.5 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500">Professional Bio</label>
+                <textarea
+                  required
+                  rows="2"
+                  placeholder="Describe your skillset (e.g. Barbering since 2 years, hair styling projects...)"
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-primary/30 outline-none"
+                ></textarea>
+              </div>
+            </>
           )}
 
           <button

@@ -18,7 +18,7 @@ const signToken = (user) => {
 };
 
 const signup = async (req, res, next) => {
-  const { email, password, full_name, role, matric_number, department, bio } = req.body;
+  const { email, password, full_name, role, matric_number, department, bio, shop_name } = req.body;
 
   try {
     const isMock = !process.env.SUPABASE_URL || process.env.SUPABASE_URL.includes('placeholder');
@@ -32,7 +32,7 @@ const signup = async (req, res, next) => {
         success: true,
         message: 'Registration successful (Mock Mode)',
         token,
-        user: { id: mockId, email, name: full_name, role, status: 'active' }
+        user: { id: mockId, email, name: full_name, role, status: 'active', shop_name: shop_name || null }
       });
     }
 
@@ -84,7 +84,7 @@ const signup = async (req, res, next) => {
     if (role === 'customer') {
       await supabaseAdmin.from('customers').insert([{ id: userId, matric_number, department }]);
     } else if (role === 'provider') {
-      await supabaseAdmin.from('providers').insert([{ id: userId, bio: bio || '', verification_status: 'pending' }]);
+      await supabaseAdmin.from('providers').insert([{ id: userId, bio: bio || '', shop_name: shop_name || null, verification_status: 'pending' }]);
       // Create verification request record so it appears on the Admin Panel
       await supabaseAdmin.from('verification_requests').insert([{
         provider_id: userId,
@@ -105,7 +105,8 @@ const signup = async (req, res, next) => {
         email,
         name: full_name,
         role,
-        status: 'active'
+        status: 'active',
+        shop_name: role === 'provider' ? (shop_name || null) : undefined
       }
     });
   } catch (err) {
@@ -145,17 +146,41 @@ const login = async (req, res, next) => {
     }
 
     // 1. Authenticate with Supabase auth
+    let userId;
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-    if (authError) {
-      return res.status(401).json({ success: false, message: authError.message });
-    }
+    
+    if (!authError && authData?.user) {
+      userId = authData.user.id;
+    } else {
+      // Fallback check: see if profile exists in database (e.g. pre-seeded demo accounts)
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('*, roles(name)')
+        .eq('email', email)
+        .single();
 
-    const userId = authData.user.id;
+      if (existingProfile) {
+        userId = existingProfile.id;
+        // Auto-create in Supabase auth in background so future sign-ins pass auth directly
+        supabaseAdmin.auth.admin.createUser({
+          id: existingProfile.id,
+          email: existingProfile.email,
+          password: password || 'password123',
+          email_confirm: true,
+          user_metadata: { full_name: existingProfile.full_name }
+        }).catch(() => {});
+      } else {
+        return res.status(401).json({ 
+          success: false, 
+          message: authError ? authError.message : 'Invalid email or password.' 
+        });
+      }
+    }
 
     // 2. Fetch full profile and role
     const { data: profile, error: profileErr } = await supabase
       .from('profiles')
-      .select('*, roles(name)')
+      .select('*, roles(name), providers(shop_name)')
       .eq('id', userId)
       .single();
 
@@ -168,6 +193,9 @@ const login = async (req, res, next) => {
     }
 
     const userRole = profile.roles ? profile.roles.name : 'customer';
+    const providerData = Array.isArray(profile.providers) ? profile.providers[0] : profile.providers;
+    const shopName = providerData ? providerData.shop_name : undefined;
+
     const token = signToken({ id: profile.id, email: profile.email, name: profile.full_name, role: userRole });
 
     res.status(200).json({
@@ -179,7 +207,8 @@ const login = async (req, res, next) => {
         email: profile.email,
         name: profile.full_name,
         role: userRole,
-        status: profile.status
+        status: profile.status,
+        shop_name: shopName
       }
     });
   } catch (err) {

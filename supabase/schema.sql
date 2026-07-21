@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 CREATE TABLE IF NOT EXISTS public.providers (
     id UUID PRIMARY KEY REFERENCES public.profiles(id) ON DELETE CASCADE,
     bio TEXT,
+    shop_name VARCHAR(255),
     verification_status VARCHAR(50) DEFAULT 'pending' CHECK (verification_status IN ('pending', 'approved', 'rejected')),
     rating_average NUMERIC(3, 2) DEFAULT 0.00 CHECK (rating_average >= 0.00 AND rating_average <= 5.00),
     banner_url TEXT,

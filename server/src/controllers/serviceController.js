@@ -428,11 +428,38 @@ const getCategories = async (req, res, next) => {
   }
 };
 
+const getMyServices = async (req, res, next) => {
+  const provider_id = req.user.id;
+  try {
+    const isMock = !process.env.SUPABASE_URL || process.env.SUPABASE_URL.includes('placeholder');
+    if (isMock) {
+      const filtered = mockServices.filter(s => s.provider_id === provider_id);
+      return res.status(200).json({ success: true, count: filtered.length, services: filtered });
+    }
+
+    const { data: services, error } = await supabase
+      .from('services')
+      .select('*, provider:providers(rating_average, profiles(full_name, avatar_url)), category:categories(name, slug)')
+      .eq('provider_id', provider_id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    res.status(200).json({ success: true, count: services.length, services: services || [] });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getAllServices,
+  getMyServices,
   getServiceById,
   createService,
   updateService,
   deleteService,
   getCategories
 };
+

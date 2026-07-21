@@ -1,6 +1,7 @@
 const express = require('express');
 const { 
   getAllServices, 
+  getMyServices,
   getServiceById, 
   createService, 
   updateService, 
@@ -29,6 +30,7 @@ const createServiceSchema = z.object({
 
 router.get('/', getAllServices);
 router.get('/categories', getCategories);
+router.get('/mine', requireAuth, requireRole(['provider']), getMyServices);
 router.get('/:id', getServiceById);
 router.post('/', requireAuth, requireRole(['provider']), validate(createServiceSchema), createService);
 router.put('/:id', requireAuth, requireRole(['provider']), updateService);
